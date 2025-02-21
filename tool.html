@@ -1,0 +1,292 @@
+<html>
+
+<head>
+    <!--e-->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@300;400;500;700&display=swap');
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: .3s;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .progress {
+            position: absolute;
+            width: 480px;
+            height: 640px;
+            background: rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            visibility: hidden;
+            transition: .3s;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .progress.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .progresstext {
+            position: absolute;
+            color: rgba(255, 255, 255, 1);
+            font-family: 'Zen Maru Gothic', sans-serif;
+            font-weight: 700;
+            font-size: 3rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: .3s;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .progresstext.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .moving_circle {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 12px solid rgba(255, 255, 255, 0.5);
+            border-top-color: rgba(255, 255, 255, 1);
+            animation: rotate 1.5s linear infinite;
+            visibility: hidden;
+            opacity: 0;
+            top: 50%;
+            left: 168px;
+        }
+
+        @keyframes rotate {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .moving_circle.active {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .complete {
+            position: absolute;
+            color: rgba(255, 255, 255, 1);
+            font-family: 'Zen Maru Gothic', sans-serif;
+            font-weight: 700;
+            font-size: 3rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: .3s;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .complete.active {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="overlay" class="overlay">
+        <div id="progress" class="progress centre">
+            <p class="progresstext">送信中...</p>
+            <div id="moving_circle" class="moving_circle"></div>
+            <p class="complete">送信完了</p>
+        </div>
+    </div>
+    <form name="form" action="" class="form">
+        <label for="id">ID:</label>
+        <br />
+        <input type="text" id="id" name="id" required minlength="8" maxlength="8" size="20" placeholder="stu00000" />
+        <br />
+        <label for="password">パスワード:</label>
+        <br />
+        <input type="password" id="password" name="password" required minlength="1" size="20" />
+        <br />
+        <label for="resourceid">教材ID:</label>
+        <br />
+        <input type="number" id="resourceid" name="resourceid" required size="20" placeholder="520" />
+        <br />
+        <label for="num">回数:</label>
+        <br />
+        <input type="number" id="num" name="num" required max="25" size="20" placeholder="max:25" />
+        <br />
+        <input type="button" id="submit" value="送信">
+    </form>
+    <script>
+        const loginurl = "https://keirinkan.sinewave-service.net/keirinkan-api/v3/student/login"
+        const url = "https://keirinkan.sinewave-service.net/keirinkan-api/v3/textbook/submit-exercise-log?student_id="
+        const logouturl = "https://keirinkan.sinewave-service.net/keirinkan-api/v3/student/logout?student_id="
+
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+
+        async function login(id, password) {
+            const loginheader = {
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Encoding': 'gzip, deflate, br, zstd',
+                'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
+                'Connection': 'keep-alive',
+                'Content-Length': '160',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Host': 'keirinkan.sinewave-service.net',
+                'Priority': 'u=0',
+                'Origin': 'https://keirinkan.sinewave-service.net',
+                'Referer': 'https://keirinkan.sinewave-service.net/',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'TE': 'trailers',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36',
+            }
+            const logindata = new URLSearchParams();
+            logindata.append("email", id)
+            logindata.append('password', password)
+            logindata.append('app_name', 'prod1.5.1')
+            logindata.append('device_code', 'PC prod1.5.1 c1be5f5a-93ed-478d-f58b-629bba4c7367')
+
+            const response = await fetch(loginurl, { headers: new Headers(loginheader), method: "POST", body: logindata.toString()});
+            const json = await response.json();
+            console.log(logindata.toString());
+            console.log(json);
+            if (json["errcode"] == 0) {
+                userid = json["data"]["user"]["id"].toString()
+                token = json["data"]["token"]
+                return [userid, token];
+            } else {
+                return null;
+            }
+        }
+
+        async function logout(userid, token) {
+            const logoutheader = {
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Encoding': 'gzip, deflate, br, zstd',
+                'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
+                'Authorization': 'Bearer ' + token,
+                'Connection': 'keep-alive',
+                'Content-Length': '0',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Host': 'keirinkan.sinewave-service.net',
+                'Priority': 'u=0',
+                'Origin': 'https://keirinkan.sinewave-service.net',
+                'Referer': 'https://keirinkan.sinewave-service.net/',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'TE': 'trailers',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0',
+            }
+            await fetch(logouturl + userid, { headers: new Headers(logoutheader), method: "POST" })
+        }
+
+        async function access(resourceid, num, userid, token) {
+            const headers = {
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Encoding': 'gzip, deflate, br, zstd',
+                'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
+                'Authorization': 'Bearer ' + token,
+                'Connection': 'keep-alive',
+                'Content-Length': '8530',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Host': 'keirinkan.sinewave-service.net',
+                'Origin': 'https://keirinkan.sinewave-service.net',
+                'Referer': 'https://keirinkan.sinewave-service.net/',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'TE': 'trailers',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0',
+            }
+            for (var i = 0; i<num; i++) {
+                const data = {
+                    "guid": (1020412894000 + getRandomInt(2312312)).toString(),
+                    "client": "keirinkan webprod1.5.1",
+                    "resource_id": resourceid.toString(),
+                    "question_id": "0",
+                    "evaluate_html": "<span><font color=\"black\">They </font><font color=\"black\">all </font><font color=\"black\">saw </font><font color=\"black\">the </font><font color=\"black\">advantage </font><font color=\"black\">in </font><font color=\"black\">the </font><font color=\"black\">print-</font><font color=\"black\">and-</font><font color=\"black\">internet </font><font color=\"black\">offer </font><font color=\"black\">over </font><font color=\"black\">the </font><font color=\"black\">print-</font><font color=\"black\">only </font><font color=\"black\">offer.  </font><font color=\"black\">Were </font><font color=\"black\">they </font><font color=\"black\">influenced </font><font color=\"black\">by </font><font color=\"black\">the </font><font color=\"black\">presence </font><font color=\"black\">of </font><font color=\"black\">the </font><font color=\"black\">print-</font><font color=\"black\">only </font><font color=\"black\">option, </font><font color=\"black\">which </font><font color=\"black\">I </font><font color=\"black\">call </font><font color=\"black\">the </font><font color=\"black\">\"decoy\"?  </font><font color=\"black\">In </font><font color=\"black\">other </font><font color=\"black\">words, </font><font color=\"black\">suppose </font><font color=\"black\">that </font><font color=\"black\">I </font><font color=\"black\">removed </font><font color=\"black\">the </font><font color=\"black\">decoy </font><font color=\"black\">so </font><font color=\"black\">that </font><font color=\"black\">the </font><font color=\"black\">choices </font><font color=\"black\">would </font><font color=\"black\">be </font><font color=\"black\">the </font><font color=\"black\">ones </font><font color=\"black\">seen </font><font color=\"black\">as </font><font color=\"black\">follows: </font><font color=\"black\">(1) </font><font color=\"black\">internet-only </font><font color=\"black\">subscription </font><font color=\"black\">for </font><font color=\"black\">$</font><font color=\"black\">59 </font><font color=\"black\">and </font><font color=\"black\">(2) </font><font color=\"black\">print-</font><font color=\"black\">and-</font><font color=\"black\">internet </font><font color=\"black\">subscription </font><font color=\"black\">for </font><font color=\"black\">$</font><font color=\"black\">125.  </font><br/><br/><font color=\"black\">Would </font><font color=\"black\">the </font><font color=\"black\">students </font><font color=\"black\">respond </font><font color=\"black\">as </font><font color=\"black\">before?  </font><font color=\"black\">After </font><font color=\"black\">all, </font><font color=\"black\">the </font><font color=\"black\">option </font><font color=\"black\">I </font><font color=\"black\">took </font><font color=\"black\">out </font><font color=\"black\">was </font><font color=\"black\">one </font><font color=\"black\">that </font><font color=\"black\">no </font><font color=\"black\">one </font><font color=\"black\">chose, </font><font color=\"black\">so </font><font color=\"black\">it </font><font color=\"black\">should </font><font color=\"black\">make </font><font color=\"black\">no </font><font color=\"black\">difference.  </font><font color=\"black\">Right?  </font><font color=\"black\">On </font><font color=\"black\">the </font><font color=\"black\">contrary, </font><font color=\"black\">this </font><font color=\"black\">time, </font><font color=\"black\">68 </font><font color=\"black\">students </font><font color=\"black\">chose </font><font color=\"black\">the </font><font color=\"black\">internet-only </font><font color=\"black\">option </font><font color=\"black\">for </font><font color=\"black\">$</font><font color=\"black\">59.  </font><font color=\"black\">Only </font><font color=\"black\">32 </font><font color=\"black\">chose </font><font color=\"black\">the </font><font color=\"black\">combination </font><font color=\"black\">subscription </font><font color=\"black\">for </font><font color=\"black\">$</font><font color=\"black\">125.  </font><font color=\"black\">What </font><font color=\"black\">could </font><font color=\"black\">have </font><font color=\"black\">possibly </font><font color=\"black\">changed </font><font color=\"black\">their </font><font color=\"black\">minds?  </font><font color=\"black\">It </font><font color=\"black\">was </font><font color=\"black\">the </font><font color=\"black\">decoy </font><font color=\"black\">that </font><font color=\"black\">made </font><font color=\"black\">them </font><font color=\"black\">choose </font><font color=\"black\">differently.  </font><font color=\"black\">This </font><font color=\"black\">is </font><font color=\"black\">not </font><font color=\"black\">only </font><font color=\"black\">irrational </font><font color=\"black\">but </font><font color=\"black\">predictably </font><font color=\"black\">irrational </font><font color=\"black\">decision </font><font color=\"black\">making </font><font color=\"black\">caused </font><font color=\"black\">by </font><font color=\"black\">relativity.  </font></span>",
+                    "sound_file": "https://elst-keirinkan.s3.ap-northeast-1.amazonaws.com/upload-webapi/63a7a36a-9c4a-11ef-a25f-0653cadae993-1723129136-27000/63a7a36a-9c4a-11ef-a25f-0653cadae993-1723129136-27000.mp3",
+                    "evaluate_result": "https://elst-keirinkan.s3.ap-northeast-1.amazonaws.com/upload-webapi/63a7a36a-9c4a-11ef-a25f-0653cadae993-1723129136-27000/63a7a36a-9c4a-11ef-a25f-0653cadae993-1723129136-27000.xml",
+                    "record_duration": (Math.round(10 * (80 + getRandomInt(40) + Math.random())) / 10).toString(),
+                    "percent_score": (90 + getRandomInt(10)).toString(),
+                    "fluency_score": (Math.round(10 * (Math.random() / 2 + 4.5)) / 10).toString(),
+                    "integrity_score": (Math.round(10 * (Math.random() / 2 + 4.5)) / 10).toString(),
+                    "accuracy_score": (Math.round(10 * (Math.random() / 2 + 4.5)) / 10).toString(),
+                    "study_report": "{\"info\":[],\"speed\":0,\"leak\":0,\"errorwords\":[],\"repeat\":0}",
+                    "total_score": (Math.round(10 * (Math.random() / 4 + 4.75)) / 10).toString(),
+                    "poorly_words": "",
+                    "practice_type": "1"
+                }
+                const senddata = new URLSearchParams(data);
+                const response = await fetch(url + userid, { headers: new Headers(headers), method: "POST", body: senddata.toString() });
+                const json = await response.json();
+                console.log(json);
+                if (json["errcode"] != 0) {
+                    console.log("something went wrong.")
+                    return false
+                }
+                return true
+            }
+        }
+
+        const overlay = document.querySelector(".overlay");
+        const progress = document.querySelector(".progress");
+        const progresstext = document.querySelector(".progresstext");
+        const complete = document.querySelector(".complete");
+        const circle = document.querySelector(".moving_circle");
+        var btn = document.getElementById("submit");
+        var id = document.getElementById("id");
+        var password = document.getElementById("password");
+        var num = document.getElementById("num");
+        var resourceid = document.getElementById("resourceid");
+        const sleep = (time) => new Promise((r) => setTimeout(r, time));
+
+        btn.addEventListener("click", async function () {
+            //document.form.submit();
+            overlay.classList.add("active");
+            progress.classList.add("active");
+            progresstext.classList.add("active");
+            circle.classList.add("active");
+            const res = await login(id.value, password.value);
+            console.log(res)
+            if (res != null) {
+                console.log("trying to access...")
+                await access(resourceid.value, num.value, res[0], res[1]);
+                await logout(res[0], res[1]);
+            } else {
+                alert("ログインできませんでした")
+            }
+            overlay.classList.remove("active");
+            progresstext.classList.remove("active");
+            circle.classList.remove("active");
+            complete.classList.add("active");
+            await sleep(2000);
+            progress.classList.remove("active")
+            complete.classList.remove("active");
+
+        })
+    </script>
+</body>
+
+</html>
